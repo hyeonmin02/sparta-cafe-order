@@ -8,8 +8,6 @@ import org.example.spartacafe.global.common.BaseEntity;
 import org.example.spartacafe.global.exception.BusinessException;
 import org.example.spartacafe.global.exception.ErrorCode;
 
-import java.util.Map;
-
 @Entity
 @Table(name = "user_point")
 @Getter
@@ -20,9 +18,6 @@ public class UserPoint extends BaseEntity {
 
     @Column(nullable = false)
     private Long balance; // 현재 잔액
-
-    @Version
-    private Long version;
 
     // 회원가입 시 초기 생성
     public static UserPoint create(Long userId) {
