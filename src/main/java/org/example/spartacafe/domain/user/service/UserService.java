@@ -1,6 +1,8 @@
 package org.example.spartacafe.domain.user.service;
 
 import lombok.RequiredArgsConstructor;
+import org.example.spartacafe.domain.point.entity.UserPoint;
+import org.example.spartacafe.domain.point.repository.UserPointRepository;
 import org.example.spartacafe.domain.user.dto.request.LoginRequest;
 import org.example.spartacafe.domain.user.dto.request.SignUpRequest;
 import org.example.spartacafe.domain.user.dto.response.LoginResponse;
@@ -22,6 +24,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtProvider jwtProvider;
+    private final UserPointRepository userPointRepository;
 
     @Transactional
     public SignUpResponse signup(SignUpRequest request) {
@@ -33,8 +36,11 @@ public class UserService {
         String encodedPassword = passwordEncoder.encode(request.password());
 
         User user = User.create(request.loginId(), encodedPassword);
-
         userRepository.save(user);
+
+        // 유저 저장 후 유저 포인트 생성 후 저장
+        UserPoint userPoint = UserPoint.create(user.getId());
+        userPointRepository.save(userPoint);
 
         return new SignUpResponse(user.getId());
     }

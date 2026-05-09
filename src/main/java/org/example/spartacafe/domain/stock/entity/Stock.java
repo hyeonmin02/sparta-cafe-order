@@ -29,8 +29,7 @@ public class Stock{
     // 재고 차감
     public void decrease(int amount) {
         if(this.quantity < amount) {
-            throw new BusinessException(ErrorCode.STOCK_INSUFFICIENT,
-                    Map.of("menuId", this.menuId, "available", this.quantity));
+            throw new BusinessException(ErrorCode.STOCK_INSUFFICIENT);
         }
         this.quantity -= amount;
     }
