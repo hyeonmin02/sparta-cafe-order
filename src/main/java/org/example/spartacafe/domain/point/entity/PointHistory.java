@@ -5,7 +5,6 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.example.spartacafe.domain.point.enums.PointType;
-import org.example.spartacafe.domain.user.entity.User;
 import org.example.spartacafe.global.common.BaseEntity;
 
 @Entity
@@ -17,9 +16,8 @@ public class PointHistory extends BaseEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
+    @Column(nullable = false)
+    private Long userId;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -31,13 +29,12 @@ public class PointHistory extends BaseEntity {
     @Column(nullable = false)
     private Long balanceAfter; // 변동 후 남은 포인트 잔액
 
-    @Column(nullable = false)
-    private Long relatedOrderId; // 사용 시 주문 ID
+    private Long relatedOrderId; // 사용 시 주문 ID, 충전 시 null
 
     // 포인트 충전 기록 메서드
-    public static PointHistory ofCharge(User user, Long amount, Long balanceAfter) {
+    public static PointHistory ofCharge(Long userId, Long amount, Long balanceAfter) {
         PointHistory history = new PointHistory();
-        history.user = user;
+        history.userId = userId;
         history.type = PointType.CHARGE;
         history.amount = amount;
         history.balanceAfter = balanceAfter;
@@ -46,9 +43,9 @@ public class PointHistory extends BaseEntity {
     }
 
     // 포인트 사용 기록 메서드
-    public static PointHistory ofUse(User user, Long amount, Long balanceAfter, Long orderId) {
+    public static PointHistory ofUse(Long userId, Long amount, Long balanceAfter, Long orderId) {
         PointHistory history = new PointHistory();
-        history.user = user;
+        history.userId = userId;
         history.type = PointType.USE;
         history.amount = -amount;    // 사용은 음수
         history.balanceAfter = balanceAfter;

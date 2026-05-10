@@ -1,48 +1,77 @@
 package org.example.spartacafe.domain.point.service;
 
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+
+import lombok.RequiredArgsConstructor;
 import org.example.spartacafe.domain.point.dto.request.PointChargeRequest;
+import org.example.spartacafe.domain.point.dto.response.PointBalanceResponse;
+import org.example.spartacafe.domain.point.dto.response.PointHistoryResponse;
 import org.example.spartacafe.domain.point.entity.PointHistory;
 import org.example.spartacafe.domain.point.entity.UserPoint;
 import org.example.spartacafe.domain.point.repository.PointHistoryRepository;
 import org.example.spartacafe.domain.point.repository.UserPointRepository;
-import org.example.spartacafe.domain.user.entity.User;
-import org.example.spartacafe.domain.user.repository.UserRepository;
 import org.example.spartacafe.global.exception.BusinessException;
 import org.example.spartacafe.global.exception.ErrorCode;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class UserPointService {
-    
-    private final UserPointRepository userPointRepository;
-    private final UserRepository userRepository;
-    private final PointHistoryRepository pointHistoryRepository;
 
-    /**
-     * 포인트 충전
-     * @param userId 유저 식별값
-     * @param request 충전 금액 DTO
-     */
+    private static final String POINT_LOCK_PREFIX = "lock:point:";
+    private static final long LOCK_WAIT_TIME = 3L;
+    private static final long LOCK_LEASE_TIME = 5L;
+
+    private final UserPointRepository userPointRepository;
+    private final PointHistoryRepository pointHistoryRepository;
+    private final RedissonClient redissonClient;
+
     @Transactional
     public void chargePoint(Long userId, PointChargeRequest request) {
-        // 1. 유저 조회
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+        RLock lock = redissonClient.getLock(POINT_LOCK_PREFIX + userId);
+        boolean acquired;
+        try {
+            acquired = lock.tryLock(LOCK_WAIT_TIME, LOCK_LEASE_TIME, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new BusinessException(ErrorCode.LOCK_INTERRUPTED);
+        }
+        if (!acquired) {
+            throw new BusinessException(ErrorCode.LOCK_TIMEOUT);
+        }
+        try {
+            // 유저 포인트 조회 (비관적 락으로 동시성 제어)
+            UserPoint userPoint = userPointRepository.findByUserIdWithLock(userId)
+                    .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
 
-        // 2. 유저 포인트 조회 (비관적 락으로 동시성 제어)
-        UserPoint userPoint = userPointRepository.findByUserIdWithLock(userId)
+            // 포인트 충전
+            userPoint.charge(request.amount());
+
+            // 충전 내역 저장
+            PointHistory history = PointHistory.ofCharge(userId, request.amount(), userPoint.getBalance());
+            pointHistoryRepository.save(history);
+        } finally {
+            lock.unlock(); // 성공이든 실패든 반드시 락 해제
+        }
+    }
+
+    // 포인트 잔액 조회
+    public PointBalanceResponse getBalance(Long userId) {
+        UserPoint userPoint = userPointRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
+        return new PointBalanceResponse(userId, userPoint.getBalance());
+    }
 
-        // 3. 포인트 충전 (엔티티 내에서 balance 증가)
-        userPoint.charge(request.amount());
-
-        // 4. 포인트 충전 내역 생성 및 저장
-        PointHistory history = PointHistory.ofCharge(user, request.amount(), userPoint.getBalance());
-        pointHistoryRepository.save(history);
+    // 포인트 내역 조회
+    public List<PointHistoryResponse> getHistory(Long userId) {
+        return pointHistoryRepository.findAllByUserIdOrderByCreatedAtDesc(userId)
+                .stream()
+                .map(PointHistoryResponse::from)
+                .toList();
     }
 }
