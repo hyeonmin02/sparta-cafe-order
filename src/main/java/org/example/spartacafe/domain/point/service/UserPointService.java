@@ -37,10 +37,14 @@ public class UserPointService {
         boolean acquired;
         try {
             acquired = lock.tryLock(LOCK_WAIT_TIME, LOCK_LEASE_TIME, TimeUnit.SECONDS);
+
+            // 락 대기중 스레드 강제 종료 발생 시 에러 반환
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new BusinessException(ErrorCode.LOCK_INTERRUPTED);
         }
+
+        // 3초 기다렸는데도 락 획득 실패 시 에러 반환
         if (!acquired) {
             throw new BusinessException(ErrorCode.LOCK_TIMEOUT);
         }

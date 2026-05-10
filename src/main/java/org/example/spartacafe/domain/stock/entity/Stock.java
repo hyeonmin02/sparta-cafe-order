@@ -18,13 +18,11 @@ public class Stock{
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
+    @Column(nullable = false, unique = true)
     private Long menuId;
 
+    @Column(nullable = false)
     private int quantity;
-
-    @Version
-    private Long version; // 낙관적 락 대비
 
     // 재고 차감
     public void decrease(int amount) {
