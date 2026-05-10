@@ -18,6 +18,8 @@ import org.example.spartacafe.domain.stock.entity.Stock;
 import org.example.spartacafe.domain.stock.repository.StockRepository;
 import org.example.spartacafe.global.exception.BusinessException;
 import org.example.spartacafe.global.exception.ErrorCode;
+import org.example.spartacafe.domain.order.event.OrderCompletedEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,6 +39,7 @@ public class OrderService {
     private final StockRepository stockRepository;
     private final UserPointRepository userPointRepository;
     private final PointHistoryRepository pointHistoryRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public OrderResponse createOrder(Long userId, OrderRequest request) {
@@ -123,8 +126,12 @@ public class OrderService {
         PointHistory history = PointHistory.ofUse(userId, totalAmount, userPoint.getBalance(), order.getId());
         pointHistoryRepository.save(history);
 
-        // 11. TODO: Kafka 이벤트 발행 (트랜잭션 커밋 후 AFTER_COMMIT)
-        //     인기 메뉴 집계 컨슈머가 받아서 Redis ZSET 업데이트
+        // 11. Spring 이벤트 발행 — 트랜잭션 커밋 후 OrderKafkaProducer.publish()가 실행됨
+        //     orderItems에서 menuId, quantity만 추출해 이벤트 객체로 변환
+        List<OrderCompletedEvent.OrderItemInfo> eventItems = orderItems.stream()
+                .map(item -> new OrderCompletedEvent.OrderItemInfo(item.getMenuId(), item.getQuantity()))
+                .toList();
+        eventPublisher.publishEvent(new OrderCompletedEvent(eventItems));
 
         return OrderResponse.from(order, orderItems);
     }
