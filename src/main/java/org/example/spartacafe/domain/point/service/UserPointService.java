@@ -6,6 +6,7 @@ import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
 import org.example.spartacafe.domain.point.dto.request.PointChargeRequest;
 import org.example.spartacafe.domain.point.dto.response.PointBalanceResponse;
+import org.example.spartacafe.domain.point.dto.response.PointChargeResponse;
 import org.example.spartacafe.domain.point.dto.response.PointHistoryResponse;
 import org.example.spartacafe.domain.point.entity.PointHistory;
 import org.example.spartacafe.domain.point.entity.UserPoint;
@@ -32,7 +33,7 @@ public class UserPointService {
     private final RedissonClient redissonClient;
 
     @Transactional
-    public void chargePoint(Long userId, PointChargeRequest request) {
+    public PointChargeResponse chargePoint(Long userId, PointChargeRequest request) {
         RLock lock = redissonClient.getLock(POINT_LOCK_PREFIX + userId);
         boolean acquired;
         try {
@@ -59,9 +60,11 @@ public class UserPointService {
             // 충전 내역 저장
             PointHistory history = PointHistory.ofCharge(userId, request.amount(), userPoint.getBalance());
             pointHistoryRepository.save(history);
+            return new PointChargeResponse(history.getBalanceAfter(),request.amount(),history.getCreatedAt());
         } finally {
             lock.unlock(); // 성공이든 실패든 반드시 락 해제
         }
+
     }
 
     // 포인트 잔액 조회

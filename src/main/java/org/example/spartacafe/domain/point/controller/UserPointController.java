@@ -6,10 +6,12 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.example.spartacafe.domain.point.dto.request.PointChargeRequest;
 import org.example.spartacafe.domain.point.dto.response.PointBalanceResponse;
+import org.example.spartacafe.domain.point.dto.response.PointChargeResponse;
 import org.example.spartacafe.domain.point.dto.response.PointHistoryResponse;
 import org.example.spartacafe.domain.point.service.UserPointService;
 import org.example.spartacafe.global.response.ApiResponse;
 import org.example.spartacafe.global.security.CustomUserDetails;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -30,14 +32,12 @@ public class UserPointController {
 
     @Operation(summary = "포인트 충전", description = "지정한 금액만큼 포인트를 충전합니다. 최소 100원, 최대 1,000,000원")
     @PostMapping("/charge")
-    public ResponseEntity<ApiResponse<String>> chargePoint(
+    public ResponseEntity<ApiResponse<PointChargeResponse>> chargePoint(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @Valid @RequestBody PointChargeRequest request) {
 
-        userPointService.chargePoint(userDetails.getUserId(), request);
-
-        String message = request.amount() + "원 충전이 완료되었습니다.";
-        return ResponseEntity.ok(ApiResponse.success(message));
+        PointChargeResponse response = userPointService.chargePoint(userDetails.getUserId(), request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
     }
 
     @Operation(summary = "포인트 잔액 조회", description = "현재 보유 포인트 잔액을 조회합니다.")
