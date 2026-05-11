@@ -1,0 +1,2 @@
+jwt:
+  secret-key: test-secret-key-for-integration-tests-must-be-at-least-256-bits-long
