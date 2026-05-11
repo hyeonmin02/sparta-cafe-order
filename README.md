@@ -1,15 +1,27 @@
-# 카페 셀프 오더 시스템
-
-> 키오스크·모바일 앱에서 사용자가 직접 메뉴를 선택해 주문·결제하는 백엔드 시스템.
+# ☕ 스파르타 카페 오더 시스템
+> 키오스크·모바일 앱에서 사용자가 직접 메뉴를 선택해 주문·결제하는 백엔드 시스템
 > **"다중 인스턴스 환경에서 정확성을 어떻게 보장할 것인가"** 를 핵심 과제로 설정했다.
 
 | 항목 | 내용 |
 |------|------|
-| 기간 | 5일 (설계 1일 + 개발 3일 + 마무리 1일) |
-| 스택 | Spring Boot 3.5.14 · Java 17 · MySQL 8 · Redis(Redisson) · Kafka · Flyway |
+| 기간 | 2026-05-07 ~ 2026-05-11 (설계 1일 + 개발 3일 + 마무리 1일) |
 | 핵심 평가 | 다중 인스턴스 동시성 제어 · 데이터 정합성 · 테스트 |
 
 ---
+## 🛠 기술 스택
+[![Skills](https://skillicons.dev/icons?i=java,spring,mysql,redis,kafka,docker)](https://skillicons.dev)
+| 기술 | 버전 | 도입 이유 |
+|------|------|-----------|
+| Java | 17 | LTS 버전. Record, Pattern Matching 등 최신 문법으로 DTO 간결화 |
+| Spring Boot | 3.5.14 | `@TransactionalEventListener` 내장으로 트랜잭션 경계와 이벤트 발행 분리 |
+| MySQL | 8.4 | `SELECT FOR UPDATE` 비관적 락으로 동시성 1차 방어. 진실의 원천 |
+| Redis (Redisson) | 7.4 / 3.27.2 | 분산락(Redisson)으로 다중 인스턴스 간 포인트 충전 직렬화. ZSET으로 인기 메뉴 실시간 랭킹 캐시 |
+| Kafka | 7.6.0 (confluentinc) | 주문 트랜잭션과 분석 이벤트 발행을 분리. AFTER_COMMIT 패턴으로 유령 이벤트 차단 |
+| Flyway | 11.7.2 | 팀 프로젝트에서 스키마 변경을 SQL 파일로 버전 관리하면 "내 로컬에서만 됨" 문제를 방지할 수 있다. 실무에서 팀원 간 DB 스키마 불일치를 막는 표준 도구를 미리 경험하기 위해 도입 |
+| Swagger (springdoc) | 2.x | 개발하면서 API 엔드포인트나 요청/응답 필드가 바뀔 때마다 문서를 수동으로 업데이트하면 코드와 문서가 불일치하는 문제가 생긴다. 실무에서는 코드 기반으로 문서가 자동 생성되어 항상 최신 상태를 유지하기 위해 사용 |
+| QueryDSL | 5.x | 동적 쿼리 대비용으로 의존성 유지. 현재 쿼리는 JPQL `@Query`로 충분한 수준 |
+| Testcontainers | - | 실제 MySQL, Redis, Kafka를 띄워 동시성 시나리오(C1~C6)를 실제 인프라 위에서 검증 |
+
 
 ## 🎯 설계 핵심: 왜 이 선택을 했나
 
@@ -59,41 +71,8 @@ LAZY 로딩 실수로 인한 N+1, LazyInitializationException을 원천 차단�
 
 ## 📐 ERD
 ![img.png](sparta-cafe-SA-docs/img.png)
-```
-category                    menus                           stocks
-├── id (PK)                 ├── id (PK)                     ├── id (PK)
-├── category_name           ├── category_id (FK→category)   ├── menu_id (UNIQUE, FK→menus)
-└── display_order           ├── name                        └── quantity
-                            ├── price
-                            ├── status
-                            ├── created_at
-                            └── updated_at
 
-users                       user_point
-├── id (PK)                 ├── user_id (PK, FK→users)
-├── login_id (UNIQUE)       ├── balance
-├── password                ├── created_at
-└── user_role               └── updated_at
 
-orders                          order_items
-├── id (PK)                     ├── id (PK)
-├── user_id (FK→users)          ├── order_id (FK→orders)
-├── status                      ├── menu_id              ← FK 없음 (ID만 보관)
-├── total_amount                ├── menu_name            ← 주문 당시 스냅샷
-├── paid_at                     ├── unit_price           ← 주문 당시 스냅샷
-├── created_at                  ├── quantity
-└── updated_at                  └── sub_total
-
-point_histories
-├── id (PK)
-├── user_id (FK→users)
-├── type (CHARGE / USE)
-├── amount               ← 충전 양수 / 사용 음수
-├── balance_after
-├── related_order_id     ← nullable, FK 없음 (ID만 보관)
-├── created_at
-└── updated_at
-```
 
 > **설계 원칙**: 애그리거트 간 참조는 Long ID로만 연결한다.
 > `order_items.menu_id`, `point_histories.related_order_id` 는 DB FK 없이 ID만 보관해 도메인 경계를 명확히 유지한다.
