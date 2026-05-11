@@ -93,6 +93,9 @@ public class OrderService {
         for (OrderRequest.OrderItemRequest itemReq : sortedItems) {
             Menu menu = menuMap.get(itemReq.menuId());
             Stock stock = stockMap.get(itemReq.menuId());
+            if (stock.getQuantity() == 0) {
+                throw new BusinessException(ErrorCode.MENU_SOLD_OUT);
+            }
             stock.decrease(itemReq.quantity()); // 재고 부족 시 STOCK_INSUFFICIENT 예외
             totalAmount += menu.getPrice() * itemReq.quantity();
         }
