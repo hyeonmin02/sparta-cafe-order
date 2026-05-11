@@ -79,7 +79,7 @@ public class SecurityConfig {
                 // 권한 설정
                 .authorizeHttpRequests(auth -> auth
                         // 인증/인가 제외 경로 (회원가입, 로그인, 메뉴 조회, Swagger)
-                        .requestMatchers(HttpMethod.POST, "/auth/signup", "/auth/login").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/signup", "/api/auth/login").permitAll()
                         .requestMatchers(HttpMethod.GET, "/menus", "/menus/popular").permitAll()
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
                         
